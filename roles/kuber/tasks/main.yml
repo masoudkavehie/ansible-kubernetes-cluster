@@ -1,16 +1,12 @@
----
-# tasks file for kuber
----
-# apt update 
-- name: Update repository cache
-  apt:
-    update_cache: yes
-    cache_valid_time: 3600
-    force_apt_get: yes    
-
+#update dns
+- name: Update DNS server
+  lineinfile:
+    path: /etc/resolv.conf
+    regexp: "^nameserver"
+    line: "nameserver 178.22.122.100"
 
 #install network-tools
-- name: Install dependencies network-tools "{{item}}"
+- name: Install dependencies network-tools"
   apt:
     name: "{{item}}"
     state: present
@@ -18,27 +14,23 @@
     - apt-transport-https
     - ca-certificates
     - curl
-#add keyring of kubernetes 
+#add keyring of kubernetes
 
 - name: Add kubernetes GPG key
-  apt_key:
-    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-    keyring: /usr/share/keyrings/kubernetes-archive-keyring.gpg
-    state: present    
-
+  shell: curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
 #add kubernetes repository                      │
-- name: Add Kubernetes APT repository                                                                         │
-  apt_repository:                                                                                         │
-    repo: deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-# apt update 
+- name: add kubernetes repository
+  shell: echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+# apt update
 - name: Update repository cache
   apt:
     update_cache: yes
     cache_valid_time: 3600
-    force_apt_get: yes   
-  
+    force_apt_get: yes
+
 #intsalling kubernetes tools
-- name: Install dependencies  kuber-tools "{{item}}"
+- name: Install dependencies  kuber-tools
   apt:
     name: "{{item}}"
     state: present
@@ -46,6 +38,26 @@
     - kubelet
     - kubeadm
     - kubectl
-# disbale swap 
-- name: disable swap .
-  command: sudo swapoff -a
+# disbale swap
+- name: disable swap
+  shell: sudo swapoff -a
+
+#initial the master node and network
+- name: initialize cluster network
+  shell: sudo kubeadm init --pod-network-cidr="{{podnetworkcidr}}"
+  when: ansible_hostname == "master"
+
+#make kube directory for your user.
+- name: make kube directory for your user
+  ansible.builtin.file:
+    path: $HOME/.kube
+#copy kuber config file to created directory.
+- name: copy kuber config file to created directory
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: $HOME/.kube/config
+    owner: $(id -u)
+    group: $(id -g)
+# installing calico network pluggin
+- name: installing calico network pluggin
+  shell: kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml

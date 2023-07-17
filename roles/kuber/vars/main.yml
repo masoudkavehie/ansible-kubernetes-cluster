@@ -1,2 +1,3 @@
 ---
 # vars file for kuber
+podnetworkcidr: 10.244.0.0/16
