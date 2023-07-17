@@ -1,0 +1,51 @@
+---
+# tasks file for kuber
+---
+# apt update 
+- name: Update repository cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    force_apt_get: yes    
+
+
+#install network-tools
+- name: Install dependencies network-tools "{{item}}"
+  apt:
+    name: "{{item}}"
+    state: present
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+#add keyring of kubernetes 
+
+- name: Add kubernetes GPG key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    keyring: /usr/share/keyrings/kubernetes-archive-keyring.gpg
+    state: present    
+
+#add kubernetes repository                      │
+- name: Add Kubernetes APT repository                                                                         │
+  apt_repository:                                                                                         │
+    repo: deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+# apt update 
+- name: Update repository cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    force_apt_get: yes   
+  
+#intsalling kubernetes tools
+- name: Install dependencies  kuber-tools "{{item}}"
+  apt:
+    name: "{{item}}"
+    state: present
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+# disbale swap 
+- name: disable swap .
+  command: sudo swapoff -a
