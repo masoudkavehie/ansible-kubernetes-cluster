@@ -14,14 +14,21 @@
     - apt-transport-https
     - ca-certificates
     - curl
+
+#check keyring and repo does exist or not
+- name: Check file existence
+  stat:
+    path: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+  register: file_stat
 #add keyring of kubernetes
 
 - name: Add kubernetes GPG key
   shell: curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+  when: file_stat.stat.exists == false
 #add kubernetes repository                      │
 - name: add kubernetes repository
   shell: echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+  when: file_stat.stat.exists == false
 # apt update
 - name: Update repository cache
   apt:
@@ -41,16 +48,43 @@
 # disbale swap
 - name: disable swap
   shell: sudo swapoff -a
-
+#remove file from
+- name: Remove file
+  file:
+    path: /etc/containerd/config.toml
+    state: absent
+#restarting all services
+- name: Restart services
+  service:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - containerd.service
+    - docker.service
+    - kubelet.service
+- name: Create ~/.kube directory
+  file:
+    path: "{{ ansible_user_dir }}/.kube"
+    state: directory
+    mode: "0700"
 #initial the master node and network
 - name: initialize cluster network
   shell: sudo kubeadm init --pod-network-cidr="{{podnetworkcidr}}"
-  when: ansible_hostname == "master"
+  when: inventory_hostname == "master"
+  register: kubeadm_output
 
-#make kube directory for your user.
-- name: make kube directory for your user
-  ansible.builtin.file:
-    path: $HOME/.kube
+#run join command in other host
+- name: Run the join command
+  command: "{{ kubeadm_output.stdout }}"
+  when: inventory_hostname in groups['worker']
+  delegate_to: master
+
+# make kube directory for your user.
+# - name: Create ~/.kube directory
+#   file:
+#     path: "{{ ansible_user_dir }}/.kube"
+#     state: directory
+#     mode: "0700"
 #copy kuber config file to created directory.
 - name: copy kuber config file to created directory
   ansible.builtin.copy:
