@@ -92,6 +92,8 @@
     dest: $HOME/.kube/config
     owner: $(id -u)
     group: $(id -g)
+    when: inventory_hostname == "master"
+
 # installing calico network pluggin
 - name: installing calico network pluggin
   shell: kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
